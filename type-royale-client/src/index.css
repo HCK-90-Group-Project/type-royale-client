@@ -1,20 +1,107 @@
-@import "tailwindcss";
+/* ============================= */
+/*  PIXEL ART SUPPORT            */
+/* ============================= */
 
-/* Custom Global Styles */
-body {
-  background-color: #111827; /* bg-gray-900 */
-  color: white;
-  overflow: hidden;
+.pixelated {
+    image-rendering: pixelated;
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
+/* ============================= */
+/*  FIREBALL ANIMATION           */
+/* ============================= */
+
+@keyframes fireball {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+
+    40% {
+        transform: scale(1.2);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
 }
-::-webkit-scrollbar-track {
-  background: #1f2937; /* bg-gray-800 */
+
+.animate-fireball {
+    animation: fireball 0.8s ease-out forwards;
 }
-::-webkit-scrollbar-thumb {
-  background-color: #ca8a04; /* bg-yellow-600 */
-  border-radius: 4px;
+
+/* ============================= */
+/*  SHIELD PULSE                 */
+/* ============================= */
+
+@keyframes shield {
+    0% {
+        transform: scale(0.7);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1.1);
+        opacity: 0;
+    }
+}
+
+.animate-shield {
+    animation: shield 0.6s ease-out forwards;
+}
+
+/* ============================= */
+/*  TOWER HIT SHAKE              */
+/* ============================= */
+
+@keyframes tower-hit {
+    0% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-6px);
+    }
+
+    50% {
+        transform: translateX(6px);
+    }
+
+    75% {
+        transform: translateX(-4px);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
+}
+
+.animate-tower-hit {
+    animation: tower-hit 0.3s ease-out;
+}
+
+/* ============================= */
+/*  FADE IN (MATCH RESULT)       */
+/* ============================= */
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.3s ease-out;
 }
