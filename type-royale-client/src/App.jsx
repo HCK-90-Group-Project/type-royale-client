@@ -1,27 +1,22 @@
 import React from 'react';
-import { GameProvider, useGame } from './context/GameContext';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { GameProvider } from './context/GameContext';
 import Lobby from './pages/Lobby';
 import GameArena from './pages/GameArena';
+import WaitingRoom from './pages/WaitingRoom';
 
-// Main content component that uses game context
-const AppContent = () => {
-  const { gameState } = useGame();
-
-  // Route based on game state
-  if (gameState.status === 'playing' || gameState.status === 'finished') {
-    return <GameArena />;
-  }
-
-  return <Lobby />;
-};
-
-// App wrapper with provider
-const App = () => {
+// App with React Router
+export default function App() {
   return (
-    <GameProvider>
-      <AppContent />
-    </GameProvider>
+    <BrowserRouter>
+      <GameProvider>
+        <Routes>
+          <Route path="/" element={<Lobby />} />
+          <Route path="/room/:roomId" element={<WaitingRoom />} />
+          <Route path="/game/:roomId" element={<GameArena />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </GameProvider>
+    </BrowserRouter>
   );
-};
-
-export default App;
+}

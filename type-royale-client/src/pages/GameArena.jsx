@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useGame } from '../context/GameContext';
 import { Heart, Crosshair, Shield, Flame, Trophy, Target } from 'lucide-react';
 import Card from '../components/Card';
@@ -8,6 +9,8 @@ import towerPlayer from '../assets/images/towers/tower_player.png';
 import towerEnemy from '../assets/images/towers/tower_enemy.png';
 
 const GameArena = () => {
+    const { roomId } = useParams();
+    const navigate = useNavigate();
     const { playerData, enemyData, gameState, submitWord, selectCard, matchResult, resetGame } = useGame();
     const [typedWord, setTypedWord] = useState('');
     const [message, setMessage] = useState('');
@@ -46,7 +49,15 @@ const GameArena = () => {
     if (gameState.status !== 'playing' && !matchResult) {
         return (
             <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex items-center justify-center">
-                <div className="text-white text-2xl">Waiting for game to start...</div>
+                <div className="text-center">
+                    <div className="text-white text-2xl mb-6">No active game found</div>
+                    <button
+                        onClick={() => navigate('/')}
+                        className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg transition-colors"
+                    >
+                        Return to Lobby
+                    </button>
+                </div>
             </div>
         );
     }

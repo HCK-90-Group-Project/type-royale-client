@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useGame } from '../context/GameContext';
-import { Users, Plus, LogIn, Sword, Bot } from 'lucide-react';
+import { Plus, LogIn, Sword, Bot } from 'lucide-react';
 
 const Lobby = () => {
-    const { gameState, createRoom, joinRoom, playerReady, connectSocket, startBotGame } = useGame();
+    const { createRoom, joinRoom, connectSocket, startBotGame } = useGame();
     const [roomId, setRoomId] = useState('');
     const [username, setUsername] = useState('');
     const [mode, setMode] = useState('menu'); // menu, create, join, bot
@@ -39,54 +39,6 @@ const Lobby = () => {
             joinRoom(roomId, username);
         }, 500);
     };
-
-    if (gameState.status === 'lobby') {
-        const players = gameState.players || [];
-        const isFull = players.length === 2;
-        
-        return (
-            <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex items-center justify-center p-6">
-                <div className="bg-slate-800/50 backdrop-blur-lg p-8 rounded-2xl border-2 border-purple-500 max-w-md w-full">
-                    <Users className="w-16 h-16 text-purple-400 mx-auto mb-4" />
-                    <h1 className="text-3xl font-bold text-white text-center mb-2">Waiting Room</h1>
-                    <p className="text-gray-300 text-center mb-6">Room ID: <span className="text-purple-400 font-bold">{gameState.roomId}</span></p>
-
-                    <div className="bg-slate-900/50 rounded-lg p-6 mb-6">
-                        <p className="text-gray-400 text-sm mb-3">Players ({players.length}/2):</p>
-                        <div className="space-y-2">
-                            {players.map((player, index) => (
-                                <div key={index} className="flex items-center gap-3 bg-green-900/30 p-3 rounded-lg border border-green-500/30">
-                                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                                    <span className="text-white font-semibold">{player.username}</span>
-                                </div>
-                            ))}
-                            {!isFull && (
-                                <div className="flex items-center gap-3 bg-slate-700/30 p-3 rounded-lg border border-gray-600/30">
-                                    <div className="w-3 h-3 bg-gray-500 rounded-full" />
-                                    <span className="text-gray-400">Waiting for opponent...</span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {isFull ? (
-                        <button
-                            onClick={playerReady}
-                            className="w-full py-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white font-bold text-lg rounded-lg transition-all duration-300 hover:shadow-lg mb-4"
-                        >
-                            🎮 Start Game
-                        </button>
-                    ) : (
-                        <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-4">
-                            <p className="text-yellow-200 text-sm text-center">
-                                Share the Room ID with your friend to start the battle!
-                            </p>
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-black flex items-center justify-center p-6">

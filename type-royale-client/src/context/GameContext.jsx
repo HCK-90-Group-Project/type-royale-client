@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 
 const DEV_AUTO_START = false;
@@ -15,6 +16,8 @@ export const useGame = () => {
 };
 
 export const GameProvider = ({ children }) => {
+    const navigate = useNavigate();
+    
     // Socket connection
     const [socket, setSocket] = useState(null);
 
@@ -25,7 +28,8 @@ export const GameProvider = ({ children }) => {
         maxHp: 100,
         ammo: 50,
         maxAmmo: 50,
-        shield: false
+        shield: false,
+        userId: null
     });
 
     // Enemy state
@@ -41,6 +45,7 @@ export const GameProvider = ({ children }) => {
         status: DEV_AUTO_START ? 'playing' : 'idle',
         roomId: DEV_AUTO_START ? 'dev-room' : null,
         playerId: null,
+        isHost: false,
         players: [],
         words: DEV_AUTO_START
             ? {
@@ -76,18 +81,32 @@ export const GameProvider = ({ children }) => {
                 const parsed = JSON.parse(savedState);
                 if (parsed.playerData) setPlayerData(parsed.playerData);
                 if (parsed.enemyData) setEnemyData(parsed.enemyData);
+                if (parsed.matchResult) setMatchResult(parsed.matchResult);
+                
                 if (parsed.gameState) {
                     setGameState(parsed.gameState);
-                    // Reconnect socket if in lobby or playing
-                    if (parsed.gameState.status === 'lobby' || parsed.gameState.status === 'playing') {
+                    
+                    // Reconnect socket and rejoin room if in active game
+                    if ((parsed.gameState.status === 'lobby' || parsed.gameState.status === 'playing') && parsed.gameState.roomId) {
                         setTimeout(() => {
                             if (socket && !socket.connected) {
                                 socket.connect();
+                                
+                                // Wait for connection then rejoin room
+                                socket.once('connect', () => {
+                                    console.log('Reconnected! Rejoining room:', parsed.gameState.roomId);
+                                    // Use the same userId that was saved
+                                    const userId = parsed.playerData?.userId || localStorage.getItem('typeRoyaleUserId');
+                                    socket.emit('join_room', { 
+                                        roomId: parsed.gameState.roomId, 
+                                        username: parsed.playerData.username,
+                                        userId: userId
+                                    });
+                                });
                             }
                         }, 500);
                     }
                 }
-                if (parsed.matchResult) setMatchResult(parsed.matchResult);
                 console.log('State restored from localStorage');
             } catch (e) {
                 console.error('Failed to restore state:', e);
@@ -129,8 +148,11 @@ export const GameProvider = ({ children }) => {
                 ...prev,
                 roomId: data.roomId,
                 status: 'lobby',
+                isHost: true,
                 players: [{ username: playerData.username }]
             }));
+            // Navigate to waiting room
+            navigate(`/room/${data.roomId}`);
         });
 
         socket.on('room_update', (data) => {
@@ -154,6 +176,7 @@ export const GameProvider = ({ children }) => {
             console.error('Join room error:', data.message);
             alert(data.message);
             setGameState(prev => ({ ...prev, status: 'idle' }));
+            navigate('/');
         });
 
         socket.on('game_start', (data) => {
@@ -190,12 +213,19 @@ export const GameProvider = ({ children }) => {
             
             console.log('Categorized words:', categorizedWords);
             
+            // Store playerId and roomId in localStorage for persistence
+            localStorage.setItem('typeRoyalePlayerId', data.yourPlayerId);
+            const currentRoomId = data.gameState?.roomId || gameState.roomId;
+            
             setGameState(prev => ({
                 ...prev,
                 status: 'playing',
                 playerId: data.yourPlayerId,
                 words: categorizedWords
             }));
+            
+            // Navigate to game arena
+            navigate(`/game/${currentRoomId}`);
         });
 
         socket.on('receive_attack', (data) => {
@@ -232,12 +262,18 @@ export const GameProvider = ({ children }) => {
         });
 
         socket.on('attack_impact', (data) => {
-            console.log('Attack impact:', data);
-            // Update enemy HP based on server's calculation
-            setEnemyData(prev => ({
-                ...prev,
-                hp: data.targetHp
-            }));
+            console.log('Attack impact:', data, 'My playerId:', gameState.playerId);
+            
+            // Only update enemy HP if the target is NOT us
+            // We check both gameState.playerId and compare with stored playerId
+            const myPlayerId = gameState.playerId || localStorage.getItem('typeRoyalePlayerId');
+            
+            if (data.targetPlayerId !== myPlayerId) {
+                setEnemyData(prev => ({
+                    ...prev,
+                    hp: data.targetHp
+                }));
+            }
         });
 
         socket.on('enemy_shield_active', () => {
@@ -279,6 +315,7 @@ export const GameProvider = ({ children }) => {
             console.log('Player disconnected:', data);
             alert(data.message);
             setGameState(prev => ({ ...prev, status: 'idle' }));
+            navigate('/');
         });
 
         return () => {
@@ -294,7 +331,7 @@ export const GameProvider = ({ children }) => {
             socket.off('match_result');
             socket.off('player_disconnected');
         };
-    }, [socket, playerData.username, enemyData.username, gameState.roomId]);
+    }, [socket, playerData.username, enemyData.username, gameState.roomId, navigate]);
 
     // Actions
     const connectSocket = () => {
@@ -303,20 +340,70 @@ export const GameProvider = ({ children }) => {
         }
     };
 
+    // Generate or get persistent userId
+    const getOrCreateUserId = () => {
+        let userId = localStorage.getItem('typeRoyaleUserId');
+        if (!userId) {
+            userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            localStorage.setItem('typeRoyaleUserId', userId);
+        }
+        return userId;
+    };
+
     const createRoom = (username) => {
         if (socket && socket.connected) {
-            const userId = Date.now().toString(); // Simple user ID for now
+            const userId = getOrCreateUserId();
             socket.emit('create_room', { username, userId });
-            setPlayerData(prev => ({ ...prev, username }));
+            setPlayerData(prev => ({ ...prev, username, userId }));
         }
     };
 
     const joinRoom = (roomId, username) => {
         if (socket && socket.connected) {
-            const userId = Date.now().toString(); // Simple user ID for now
+            const userId = getOrCreateUserId();
             socket.emit('join_room', { roomId, username, userId });
-            setPlayerData(prev => ({ ...prev, username }));
-            setGameState(prev => ({ ...prev, roomId, status: 'lobby' }));
+            setPlayerData(prev => ({ ...prev, username, userId }));
+            setGameState(prev => ({ ...prev, roomId, status: 'lobby', isHost: false }));
+            // Navigate to waiting room
+            navigate(`/room/${roomId}`);
+        }
+    };
+
+    // Rejoin a room (for page refresh scenarios)
+    const rejoinRoom = (roomId) => {
+        // Get saved data from localStorage
+        const savedState = localStorage.getItem('typeRoyaleState');
+        if (!savedState) return false;
+        
+        try {
+            const parsed = JSON.parse(savedState);
+            const username = parsed.playerData?.username;
+            const userId = parsed.playerData?.userId || localStorage.getItem('typeRoyaleUserId');
+            
+            if (!username || !userId) return false;
+            
+            // Restore player data
+            if (parsed.playerData) setPlayerData(parsed.playerData);
+            if (parsed.enemyData) setEnemyData(parsed.enemyData);
+            if (parsed.gameState) setGameState(parsed.gameState);
+            
+            // Connect socket and rejoin
+            if (socket && !socket.connected) {
+                socket.connect();
+                
+                socket.once('connect', () => {
+                    console.log('Reconnecting to room:', roomId);
+                    socket.emit('join_room', { roomId, username, userId });
+                });
+            } else if (socket && socket.connected) {
+                console.log('Already connected, rejoining room:', roomId);
+                socket.emit('join_room', { roomId, username, userId });
+            }
+            
+            return true;
+        } catch (e) {
+            console.error('Failed to rejoin room:', e);
+            return false;
         }
     };
 
@@ -348,6 +435,9 @@ export const GameProvider = ({ children }) => {
             selectedCard: null,
             duration: 0
         });
+
+        // Navigate to game arena
+        navigate('/game/bot-game');
 
         // Start bot AI
         startBotAI();
@@ -481,6 +571,7 @@ export const GameProvider = ({ children }) => {
             status: 'idle',
             roomId: null,
             playerId: null,
+            isHost: false,
             players: [],
             words: { easy: [], medium: [], hard: [], shield: [] },
             currentWord: '',
@@ -489,6 +580,11 @@ export const GameProvider = ({ children }) => {
         });
         setMatchResult(null);
         localStorage.removeItem('typeRoyaleState');
+        localStorage.removeItem('typeRoyalePlayerId');
+        // Keep userId for future games
+        
+        // Navigate back to lobby
+        navigate('/');
     };
 
     const value = {
@@ -500,6 +596,7 @@ export const GameProvider = ({ children }) => {
         connectSocket,
         createRoom,
         joinRoom,
+        rejoinRoom,
         playerReady,
         startBotGame,
         selectCard,
