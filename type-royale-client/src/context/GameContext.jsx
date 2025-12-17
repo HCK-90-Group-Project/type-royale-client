@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import io from 'socket.io-client';
 
-const DEV_AUTO_START = true;
+const DEV_AUTO_START = false;
 
 
 const GameContext = createContext();
@@ -40,6 +40,8 @@ export const GameProvider = ({ children }) => {
     const [gameState, setGameState] = useState({
         status: DEV_AUTO_START ? 'playing' : 'idle',
         roomId: DEV_AUTO_START ? 'dev-room' : null,
+        playerId: null,
+        players: [],
         words: DEV_AUTO_START
             ? {
                 easy: ['fire', 'mage', 'orb'],
@@ -66,6 +68,44 @@ export const GameProvider = ({ children }) => {
     const [isBotMode, setIsBotMode] = useState(false);
     const [botInterval, setBotInterval] = useState(null);
 
+    // Load state from localStorage on mount
+    useEffect(() => {
+        const savedState = localStorage.getItem('typeRoyaleState');
+        if (savedState) {
+            try {
+                const parsed = JSON.parse(savedState);
+                if (parsed.playerData) setPlayerData(parsed.playerData);
+                if (parsed.enemyData) setEnemyData(parsed.enemyData);
+                if (parsed.gameState) {
+                    setGameState(parsed.gameState);
+                    // Reconnect socket if in lobby or playing
+                    if (parsed.gameState.status === 'lobby' || parsed.gameState.status === 'playing') {
+                        setTimeout(() => {
+                            if (socket && !socket.connected) {
+                                socket.connect();
+                            }
+                        }, 500);
+                    }
+                }
+                if (parsed.matchResult) setMatchResult(parsed.matchResult);
+                console.log('State restored from localStorage');
+            } catch (e) {
+                console.error('Failed to restore state:', e);
+            }
+        }
+    }, [socket]);
+
+    // Save state to localStorage whenever it changes
+    useEffect(() => {
+        const stateToSave = {
+            playerData,
+            enemyData,
+            gameState,
+            matchResult
+        };
+        localStorage.setItem('typeRoyaleState', JSON.stringify(stateToSave));
+    }, [playerData, enemyData, gameState, matchResult]);
+
     // Initialize socket connection
     useEffect(() => {
         const newSocket = io('http://localhost:3000', {
@@ -83,66 +123,178 @@ export const GameProvider = ({ children }) => {
     useEffect(() => {
         if (!socket) return;
 
+        socket.on('room_created', (data) => {
+            console.log('Room created:', data);
+            setGameState(prev => ({
+                ...prev,
+                roomId: data.roomId,
+                status: 'lobby',
+                players: [{ username: playerData.username }]
+            }));
+        });
+
         socket.on('room_update', (data) => {
             console.log('Room update:', data);
-            if (data.players.length === 2) {
-                const enemy = data.players.find(p => p.username !== playerData.username);
-                setEnemyData(prev => ({ ...prev, username: enemy.username }));
+            if (data.players && data.players.length > 0) {
+                setGameState(prev => ({
+                    ...prev,
+                    players: data.players
+                }));
+                
+                if (data.players.length === 2) {
+                    const enemy = data.players.find(p => p.username !== playerData.username);
+                    if (enemy) {
+                        setEnemyData(prev => ({ ...prev, username: enemy.username }));
+                    }
+                }
             }
+        });
+
+        socket.on('join_room_error', (data) => {
+            console.error('Join room error:', data.message);
+            alert(data.message);
+            setGameState(prev => ({ ...prev, status: 'idle' }));
         });
 
         socket.on('game_start', (data) => {
             console.log('Game starting:', data);
+            
+            // Convert word array to categorized object
+            const categorizedWords = {
+                easy: [],
+                medium: [],
+                hard: [],
+                shield: []
+            };
+            
+            if (data.words && Array.isArray(data.words)) {
+                data.words.forEach(wordObj => {
+                    const word = typeof wordObj === 'string' ? wordObj : wordObj.word;
+                    const wordLength = word.length;
+                    
+                    // Categorize by word length
+                    if (wordLength <= 4) {
+                        categorizedWords.easy.push(word);
+                    } else if (wordLength <= 7) {
+                        categorizedWords.medium.push(word);
+                    } else {
+                        categorizedWords.hard.push(word);
+                    }
+                    
+                    // Also add shorter words to shield pool
+                    if (wordLength <= 6) {
+                        categorizedWords.shield.push(word);
+                    }
+                });
+            }
+            
+            console.log('Categorized words:', categorizedWords);
+            
             setGameState(prev => ({
                 ...prev,
                 status: 'playing',
-                words: data.words
+                playerId: data.yourPlayerId,
+                words: categorizedWords
             }));
         });
 
         socket.on('receive_attack', (data) => {
             console.log('Received attack:', data);
-            const newHp = playerData.shield ? playerData.hp : Math.max(0, playerData.hp - data.damage);
             
+            // Use server's authoritative HP value
             setPlayerData(prev => {
-                if (prev.shield) {
-                    // Shield blocks the attack
+                if (data.blocked) {
+                    // Shield blocked the attack
                     return { ...prev, shield: false };
                 }
+                
+                // Use targetHp from server (authoritative)
+                const newHp = data.targetHp;
+                
+                // Check if player HP reaches zero (player loses)
+                if (newHp <= 0) {
+                    setTimeout(() => {
+                        setMatchResult({ winner: enemyData.username, reason: 'Your tower destroyed' });
+                        setGameState(prev => ({ ...prev, status: 'finished' }));
+                    }, 500);
+                }
+                
                 return { ...prev, hp: newHp };
             });
+        });
 
-            // Check if player HP reaches zero (player loses)
-            if (newHp <= 0 && !playerData.shield) {
-                setMatchResult({ winner: enemyData.username, reason: 'Your tower destroyed' });
-                setGameState(prev => ({ ...prev, status: 'finished' }));
+        socket.on('attack_launched', (data) => {
+            console.log('Attack launched:', data);
+            // Update ammo count if it's our attack
+            if (data.from === 'player1' || data.from === 'player2') {
+                // Visual feedback could go here
             }
+        });
+
+        socket.on('attack_impact', (data) => {
+            console.log('Attack impact:', data);
+            // Update enemy HP based on server's calculation
+            setEnemyData(prev => ({
+                ...prev,
+                hp: data.targetHp
+            }));
         });
 
         socket.on('enemy_shield_active', () => {
             console.log('Enemy activated shield');
             setEnemyData(prev => ({ ...prev, shield: true }));
 
-            // Remove shield visual after 3 seconds
+            // Remove shield visual after duration
             setTimeout(() => {
                 setEnemyData(prev => ({ ...prev, shield: false }));
-            }, 3000);
+            }, 5000);
+        });
+
+        socket.on('shield_activated', (data) => {
+            console.log('Shield activated:', data);
         });
 
         socket.on('match_result', (data) => {
             console.log('Match result:', data);
-            setMatchResult(data);
+            
+            // Map player1/player2 to actual usernames
+            let winnerName = data.winner;
+            if (data.finalState) {
+                if (data.winner === 'player1') {
+                    winnerName = data.finalState.player1.username;
+                } else if (data.winner === 'player2') {
+                    winnerName = data.finalState.player2.username;
+                }
+            }
+            
+            setMatchResult({
+                ...data,
+                winner: winnerName,
+                winnerPlayerId: data.winner
+            });
             setGameState(prev => ({ ...prev, status: 'finished' }));
         });
 
+        socket.on('player_disconnected', (data) => {
+            console.log('Player disconnected:', data);
+            alert(data.message);
+            setGameState(prev => ({ ...prev, status: 'idle' }));
+        });
+
         return () => {
+            socket.off('room_created');
             socket.off('room_update');
+            socket.off('join_room_error');
             socket.off('game_start');
             socket.off('receive_attack');
+            socket.off('attack_launched');
+            socket.off('attack_impact');
             socket.off('enemy_shield_active');
+            socket.off('shield_activated');
             socket.off('match_result');
+            socket.off('player_disconnected');
         };
-    }, [socket, playerData.username, playerData.shield]);
+    }, [socket, playerData.username, enemyData.username, gameState.roomId]);
 
     // Actions
     const connectSocket = () => {
@@ -151,11 +303,26 @@ export const GameProvider = ({ children }) => {
         }
     };
 
+    const createRoom = (username) => {
+        if (socket && socket.connected) {
+            const userId = Date.now().toString(); // Simple user ID for now
+            socket.emit('create_room', { username, userId });
+            setPlayerData(prev => ({ ...prev, username }));
+        }
+    };
+
     const joinRoom = (roomId, username) => {
-        if (socket) {
-            socket.emit('join_room', { roomId, username });
+        if (socket && socket.connected) {
+            const userId = Date.now().toString(); // Simple user ID for now
+            socket.emit('join_room', { roomId, username, userId });
             setPlayerData(prev => ({ ...prev, username }));
             setGameState(prev => ({ ...prev, roomId, status: 'lobby' }));
+        }
+    };
+
+    const playerReady = () => {
+        if (socket && socket.connected && gameState.roomId) {
+            socket.emit('player_ready', { roomId: gameState.roomId });
         }
     };
 
@@ -204,28 +371,6 @@ export const GameProvider = ({ children }) => {
                 }
 
                 return prev.shield ? { ...prev, shield: false } : { ...prev, hp: newHp };
-        // Bot mode: no socket, just local state
-        if (isBotMode) {
-            // Update enemy HP locally
-            const newEnemyHp = Math.max(0, enemyData.hp - damage);
-            setEnemyData(prev => ({
-                ...prev,
-                hp: newEnemyHp
-            }));
-
-            setPlayerData(prev => ({ ...prev, ammo: prev.ammo - 1 }));
-            setGameState(prev => ({ ...prev, selectedCard: null, currentWord: '' }));
-
-            // Check if enemy HP reaches zero (player wins)
-            if (newEnemyHp <= 0) {
-                setMatchResult({ winner: playerData.username, reason: 'Enemy tower destroyed' });
-                setGameState(prev => ({ ...prev, status: 'finished' }));
-                if (botInterval) clearInterval(botInterval);
-            }
-
-            return { success: true, message: `Hit for ${damage} damage!` };
-        }
-
             });
         }, Math.random() * 2000 + 3000); // 3-5 seconds
 
@@ -235,13 +380,22 @@ export const GameProvider = ({ children }) => {
     const selectCard = (cardType) => {
         if (gameState.status !== 'playing') return;
 
-        const words = gameState.words[cardType];
-        if (botInterval) {
+        // Only clear bot interval if in bot mode
+        if (isBotMode && botInterval) {
             clearInterval(botInterval);
             setBotInterval(null);
         }
-        setIsBotMode(false);
-        if (!words || words.length === 0) return;
+
+        const words = gameState.words[cardType];
+        
+        console.log('Selecting card:', cardType);
+        console.log('Available words:', words);
+        console.log('All game words:', gameState.words);
+        
+        if (!words || words.length === 0) {
+            console.error('No words available for card type:', cardType);
+            return;
+        }
 
         const randomWord = words[Math.floor(Math.random() * words.length)];
 
@@ -261,10 +415,13 @@ export const GameProvider = ({ children }) => {
 
         // Handle shield
         if (cardType === 'shield') {
-            socket.emit('activate_shield', { roomId: gameState.roomId });
+            socket.emit('activate_shield', { 
+                roomId: gameState.roomId,
+                typedWord: typedWord 
+            });
             setPlayerData(prev => ({ ...prev, shield: true, ammo: prev.ammo - 1 }));
 
-            // Remove shield after it blocks one attack or 5 seconds
+            // Remove shield after it blocks one attack or duration
             setTimeout(() => {
                 setPlayerData(prev => ({ ...prev, shield: false }));
             }, 5000);
@@ -282,35 +439,22 @@ export const GameProvider = ({ children }) => {
 
         const damage = damageMap[cardType];
 
+        // Send attack to server with correct parameters
         socket.emit('send_attack', {
             roomId: gameState.roomId,
-            damage,
-            type: cardType
+            attackType: cardType,
+            typedWord: typedWord
         });
-
-        // Update enemy HP locally (will be synced by server)
-        const newEnemyHp = Math.max(0, enemyData.hp - damage);
-        setEnemyData(prev => ({
-            ...prev,
-            hp: newEnemyHp
-        }));
 
         setPlayerData(prev => ({ ...prev, ammo: prev.ammo - 1 }));
         setGameState(prev => ({ ...prev, selectedCard: null, currentWord: '' }));
-
-        // Check if enemy HP reaches zero (player wins)
-        if (newEnemyHp <= 0) {
-            socket.emit('player_win', { roomId: gameState.roomId, winner: playerData.username });
-            setMatchResult({ winner: playerData.username, reason: 'Enemy tower destroyed' });
-            setGameState(prev => ({ ...prev, status: 'finished' }));
-        }
 
         // Check if player is out of ammo
         if (playerData.ammo - 1 <= 0) {
             socket.emit('player_lose', { roomId: gameState.roomId });
         }
 
-        return { success: true, message: `Hit for ${damage} damage!` };
+        return { success: true, message: `Attack sent for ${damage} damage!` };
     };
 
     const resetGame = () => {
@@ -336,12 +480,15 @@ export const GameProvider = ({ children }) => {
         setGameState({
             status: 'idle',
             roomId: null,
+            playerId: null,
+            players: [],
             words: { easy: [], medium: [], hard: [], shield: [] },
             currentWord: '',
             selectedCard: null,
             duration: 0
         });
         setMatchResult(null);
+        localStorage.removeItem('typeRoyaleState');
     };
 
     const value = {
@@ -351,7 +498,9 @@ export const GameProvider = ({ children }) => {
         gameState,
         matchResult,
         connectSocket,
+        createRoom,
         joinRoom,
+        playerReady,
         startBotGame,
         selectCard,
         submitWord,

@@ -29,16 +29,24 @@ export const initializeSocket = () => {
 
 // Socket event emitters
 export const socketEmit = {
-    joinRoom: (socket, { roomId, username }) => {
-        socket.emit('join_room', { roomId, username });
+    createRoom: (socket, { username, userId }) => {
+        socket.emit('create_room', { username, userId });
     },
 
-    sendAttack: (socket, { roomId, damage, type }) => {
-        socket.emit('send_attack', { roomId, damage, type });
+    joinRoom: (socket, { roomId, username, userId }) => {
+        socket.emit('join_room', { roomId, username, userId });
     },
 
-    activateShield: (socket, { roomId }) => {
-        socket.emit('activate_shield', { roomId });
+    playerReady: (socket, { roomId }) => {
+        socket.emit('player_ready', { roomId });
+    },
+
+    sendAttack: (socket, { roomId, attackType, typedWord }) => {
+        socket.emit('send_attack', { roomId, attackType, typedWord });
+    },
+
+    activateShield: (socket, { roomId, typedWord }) => {
+        socket.emit('activate_shield', { roomId, typedWord });
     },
 
     playerLose: (socket, { roomId }) => {
@@ -49,11 +57,17 @@ export const socketEmit = {
 // Socket event listeners helper
 export const setupSocketListeners = (socket, callbacks) => {
     const events = {
+        room_created: callbacks.onRoomCreated,
         room_update: callbacks.onRoomUpdate,
+        join_room_error: callbacks.onJoinRoomError,
+        player_ready_update: callbacks.onPlayerReadyUpdate,
         game_start: callbacks.onGameStart,
         receive_attack: callbacks.onReceiveAttack,
         enemy_shield_active: callbacks.onEnemyShield,
+        attack_launched: callbacks.onAttackLaunched,
+        shield_activated: callbacks.onShieldActivated,
         match_result: callbacks.onMatchResult,
+        player_disconnected: callbacks.onPlayerDisconnected,
     };
 
     Object.entries(events).forEach(([event, callback]) => {
