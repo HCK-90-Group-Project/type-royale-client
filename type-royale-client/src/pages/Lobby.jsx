@@ -42,6 +42,7 @@ const Lobby = () => {
     if (savedGameState) {
       try {
         const parsed = JSON.parse(savedGameState);
+        // Only redirect if there's an active game (not finished or idle)
         if (parsed.gameState?.roomId && parsed.gameState?.status) {
           if (parsed.gameState.status === "playing") {
             navigate(`/game/${parsed.gameState.roomId}`);
@@ -50,6 +51,7 @@ const Lobby = () => {
             navigate(`/room/${parsed.gameState.roomId}`);
             return;
           }
+          // If status is "finished" or "idle", don't redirect - stay in lobby
         }
       } catch (e) {
         console.error("Failed to parse game state:", e);

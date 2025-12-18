@@ -17,7 +17,7 @@ import MusicControl from "../components/MusicControl";
 const WaitingRoom = () => {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  const { gameState, playerReady, resetGame, rejoinRoom } = useGame();
+  const { gameState, playerReady, resetGame, rejoinRoom, opponentDisconnected } = useGame();
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [reconnectAttempted, setReconnectAttempted] = useState(false);
   const [copied, setCopied] = useState(false);

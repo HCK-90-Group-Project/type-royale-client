@@ -20,11 +20,20 @@ import Confetti from "../components/Confetti";
 
 const MatchResultPage = () => {
   const navigate = useNavigate();
-  const { matchResult, playerData, enemyData, resetGame, isBotMode } =
+  const { matchResult, playerData, enemyData, gameState, resetGame, isBotMode } =
     useGame();
   const [showStats, setShowStats] = useState(false);
 
-  const isWinner = matchResult?.winner === playerData.username;
+  // Determine if current player is the winner using multiple methods for robustness
+  // 1. Use isVictory flag set during match_result event (most reliable)
+  // 2. Compare playerId with winnerPlayerId
+  // 3. Compare username with winner name
+  const storedPlayerId = localStorage.getItem("typeRoyalePlayerId");
+  const isWinner = 
+    matchResult?.isVictory === true ||
+    matchResult?.winnerPlayerId === gameState.playerId ||
+    matchResult?.winnerPlayerId === storedPlayerId ||
+    matchResult?.winner === playerData.username;
 
   const { isMuted, toggleMute } = useAudio(isWinner ? "victory" : "defeat", {
     volume: 0.4,
@@ -56,7 +65,7 @@ const MatchResultPage = () => {
 
   const handlePlayAgain = () => {
     resetGame();
-    navigate("/lobby");
+    // Note: resetGame() already navigates to /lobby, no need to navigate again
   };
 
   return (

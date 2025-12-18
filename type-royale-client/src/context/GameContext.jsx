@@ -8,6 +8,12 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import io from "socket.io-client";
+import {
+  saveSessionData,
+  getSessionData,
+  clearSessionData,
+  hasActiveSession,
+} from "../utils/socketClient";
 
 const DEV_AUTO_START = false;
 
@@ -81,6 +87,9 @@ export const GameProvider = ({ children }) => {
   // Track if initial state restoration has been done
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Track temporary disconnection of opponent
+  const [opponentDisconnected, setOpponentDisconnected] = useState(false);
+
   // Load state from localStorage on mount (only once)
   useEffect(() => {
     if (isInitialized) return;
@@ -146,7 +155,12 @@ export const GameProvider = ({ children }) => {
   }, [socket, isInitialized]);
 
   // Save state to localStorage whenever it changes
+  // Don't save if game is finished - we want a clean slate after match ends
   useEffect(() => {
+    if (gameState.status === "finished" || gameState.status === "idle") {
+      // Don't save finished or idle states to prevent unwanted redirects
+      return;
+    }
     const stateToSave = {
       playerData,
       enemyData,
@@ -159,7 +173,39 @@ export const GameProvider = ({ children }) => {
   // Initialize socket connection
   useEffect(() => {
     const newSocket = io("http://localhost:3000", {
-      autoConnect: false,
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionDelay: 500,
+      reconnectionDelayMax: 2000,
+      reconnectionAttempts: 10,
+      timeout: 10000,
+      autoConnect: true,
+    });
+
+    // Handle reconnection with session data
+    newSocket.on("connect", () => {
+      console.log("✅ Socket connected:", newSocket.id);
+
+      // Check if there's an active session to rejoin
+      // Don't rejoin if the game is finished
+      const session = getSessionData();
+      if (hasActiveSession() && session.gameStatus !== "finished") {
+        console.log("🔄 Attempting to rejoin room:", session.roomId);
+        newSocket.emit("rejoin_room", {
+          roomId: session.roomId,
+          userId: session.userId,
+          username: session.username,
+          gameStatus: session.gameStatus,
+        });
+      }
+    });
+
+    newSocket.on("reconnect", (attemptNumber) => {
+      console.log(`🔄 Reconnected after ${attemptNumber} attempts`);
+    });
+
+    newSocket.on("reconnect_attempt", (attemptNumber) => {
+      console.log(`🔄 Reconnection attempt ${attemptNumber}`);
     });
 
     setSocket(newSocket);
@@ -182,6 +228,13 @@ export const GameProvider = ({ children }) => {
         isHost: true,
         players: [{ username: playerData.username }],
       }));
+      // Save session data for reconnection
+      saveSessionData({
+        roomId: data.roomId,
+        username: playerData.username,
+        userId: playerData.userId,
+        gameStatus: "lobby",
+      });
       // Navigate to waiting room
       navigate(`/room/${data.roomId}`);
     });
@@ -256,6 +309,14 @@ export const GameProvider = ({ children }) => {
         playerId: data.yourPlayerId,
         words: categorizedWords,
       }));
+
+      // Update session data with game status
+      saveSessionData({
+        roomId: currentRoomId,
+        username: playerData.username,
+        userId: playerData.userId,
+        gameStatus: "playing",
+      });
 
       // Navigate to game arena
       navigate(`/game/${currentRoomId}`);
@@ -332,22 +393,34 @@ export const GameProvider = ({ children }) => {
     socket.on("match_result", (data) => {
       console.log("Match result:", data);
 
+      // Get current player ID from state or localStorage
+      const myPlayerId = gameState.playerId || localStorage.getItem("typeRoyalePlayerId");
+
       // Map player1/player2 to actual usernames
       let winnerName = data.winner;
       if (data.finalState) {
         if (data.winner === "player1") {
-          winnerName = data.finalState.player1.username;
+          winnerName = data.finalState.player1?.username || "Player 1";
         } else if (data.winner === "player2") {
-          winnerName = data.finalState.player2.username;
+          winnerName = data.finalState.player2?.username || "Player 2";
         }
       }
+
+      // Determine if current player won
+      const didIWin = data.winner === myPlayerId;
 
       setMatchResult({
         ...data,
         winner: winnerName,
         winnerPlayerId: data.winner,
+        isVictory: didIWin,
       });
       setGameState((prev) => ({ ...prev, status: "finished" }));
+
+      // Clear all session and storage data since game is over
+      clearSessionData();
+      localStorage.removeItem("typeRoyaleState");
+      localStorage.removeItem("typeRoyalePlayerId");
 
       // Navigate to result page
       navigate("/result");
@@ -355,14 +428,35 @@ export const GameProvider = ({ children }) => {
 
     socket.on("player_disconnected", (data) => {
       console.log("Player disconnected:", data);
+      setOpponentDisconnected(false);
+      // Clear session data since the game is over
+      clearSessionData();
       alert(data.message);
       setGameState((prev) => ({ ...prev, status: "idle" }));
       navigate("/lobby");
     });
 
+    // Handle temporary disconnection (opponent might reconnect)
+    socket.on("player_temporarily_disconnected", (data) => {
+      console.log("Player temporarily disconnected:", data);
+      setOpponentDisconnected(true);
+    });
+
+    // Handle opponent reconnection
+    socket.on("player_reconnected", (data) => {
+      console.log("Player reconnected:", data);
+      setOpponentDisconnected(false);
+    });
+
     // Handle successful rejoin
     socket.on("rejoin_success", (data) => {
       console.log("Rejoin successful:", data);
+
+      // Don't restore state if game is already finished - user should stay in lobby
+      if (gameState.status === "finished" || matchResult) {
+        console.log("Game already finished, ignoring rejoin success");
+        return;
+      }
 
       if (data.gameState) {
         // Update game state with server's authoritative state
@@ -371,6 +465,7 @@ export const GameProvider = ({ children }) => {
           status: data.gameState.status,
           players: data.gameState.players || prev.players,
           roomId: data.roomId,
+          playerId: data.playerId,
         }));
 
         // Update player HP if provided
@@ -379,7 +474,7 @@ export const GameProvider = ({ children }) => {
             ...prev,
             hp: data.playerState.hp ?? prev.hp,
             ammo: data.playerState.ammo ?? prev.ammo,
-            shield: data.playerState.shield ?? prev.shield,
+            shield: data.playerState.shield?.active ?? prev.shield,
           }));
         }
 
@@ -388,8 +483,19 @@ export const GameProvider = ({ children }) => {
           setEnemyData((prev) => ({
             ...prev,
             hp: data.enemyState.hp ?? prev.hp,
-            shield: data.enemyState.shield ?? prev.shield,
+            shield: data.enemyState.shield?.active ?? prev.shield,
+            username: data.enemyState.username ?? prev.username,
           }));
+        }
+
+        // Update session data only if game is still active
+        if (data.gameState.status !== "finished") {
+          saveSessionData({
+            roomId: data.roomId,
+            username: playerData.username,
+            userId: playerData.userId,
+            gameStatus: data.gameState.status,
+          });
         }
       }
     });
@@ -398,6 +504,7 @@ export const GameProvider = ({ children }) => {
     socket.on("rejoin_failed", (data) => {
       console.log("Rejoin failed:", data.message);
       // Clear stored state and redirect to lobby
+      clearSessionData();
       localStorage.removeItem("typeRoyaleState");
       localStorage.removeItem("typeRoyalePlayerId");
       setGameState((prev) => ({ ...prev, status: "idle", roomId: null }));
@@ -416,12 +523,15 @@ export const GameProvider = ({ children }) => {
       socket.off("shield_activated");
       socket.off("match_result");
       socket.off("player_disconnected");
+      socket.off("player_temporarily_disconnected");
+      socket.off("player_reconnected");
       socket.off("rejoin_success");
       socket.off("rejoin_failed");
     };
   }, [
     socket,
     playerData.username,
+    playerData.userId,
     enemyData.username,
     gameState.roomId,
     navigate,
@@ -449,6 +559,7 @@ export const GameProvider = ({ children }) => {
       const userId = getOrCreateUserId();
       socket.emit("create_room", { username, userId });
       setPlayerData((prev) => ({ ...prev, username, userId }));
+      // Session data will be saved when room_created event is received
     }
   };
 
@@ -463,6 +574,13 @@ export const GameProvider = ({ children }) => {
         status: "lobby",
         isHost: false,
       }));
+      // Save session data for reconnection
+      saveSessionData({
+        roomId,
+        username,
+        userId,
+        gameStatus: "lobby",
+      });
       // Navigate to waiting room
       navigate(`/room/${roomId}`);
     }
@@ -470,61 +588,71 @@ export const GameProvider = ({ children }) => {
 
   // Rejoin a room (for page refresh scenarios)
   const rejoinRoom = (roomId) => {
-    // Get saved data from localStorage
+    // Try to get data from session storage first, then localStorage
+    let session = getSessionData();
     const savedState = localStorage.getItem("typeRoyaleState");
-    if (!savedState) {
-      console.log("No saved state found for rejoin");
+
+    // If no session data, try to restore from localStorage
+    if (!session.username || !session.userId) {
+      if (savedState) {
+        try {
+          const parsed = JSON.parse(savedState);
+          session = {
+            roomId: roomId,
+            username: parsed.playerData?.username,
+            userId: parsed.playerData?.userId || localStorage.getItem("typeRoyaleUserId"),
+            gameStatus: parsed.gameState?.status,
+          };
+        } catch (e) {
+          console.error("Failed to parse saved state:", e);
+        }
+      }
+    }
+
+    if (!session.username || !session.userId) {
+      console.log("No username or userId found for rejoin");
       return false;
     }
 
-    try {
-      const parsed = JSON.parse(savedState);
-      const username = parsed.playerData?.username;
-      const userId =
-        parsed.playerData?.userId || localStorage.getItem("typeRoyaleUserId");
-      const gameStatus = parsed.gameState?.status;
-
-      if (!username || !userId) {
-        console.log("No username or userId found for rejoin");
-        return false;
+    // Restore player data immediately from localStorage
+    if (savedState) {
+      try {
+        const parsed = JSON.parse(savedState);
+        if (parsed.playerData) setPlayerData(parsed.playerData);
+        if (parsed.enemyData) setEnemyData(parsed.enemyData);
+        if (parsed.gameState) setGameState(parsed.gameState);
+      } catch (e) {
+        console.error("Failed to restore state:", e);
       }
+    }
 
-      // Restore player data immediately
-      if (parsed.playerData) setPlayerData(parsed.playerData);
-      if (parsed.enemyData) setEnemyData(parsed.enemyData);
-      if (parsed.gameState) setGameState(parsed.gameState);
+    // Connect socket and rejoin using rejoin_room event
+    if (socket && !socket.connected) {
+      socket.connect();
 
-      // Connect socket and rejoin using rejoin_room event
-      if (socket && !socket.connected) {
-        socket.connect();
-
-        socket.once("connect", () => {
-          console.log("Socket connected, sending rejoin_room for:", roomId);
-          socket.emit("rejoin_room", {
-            roomId,
-            username,
-            userId,
-            gameStatus,
-          });
-        });
-      } else if (socket && socket.connected) {
-        console.log("Already connected, sending rejoin_room for:", roomId);
+      socket.once("connect", () => {
+        console.log("Socket connected, sending rejoin_room for:", roomId);
         socket.emit("rejoin_room", {
           roomId,
-          username,
-          userId,
-          gameStatus,
+          username: session.username,
+          userId: session.userId,
+          gameStatus: session.gameStatus,
         });
-      } else {
-        console.log("Socket not available for rejoin");
-        return false;
-      }
-
-      return true;
-    } catch (e) {
-      console.error("Failed to rejoin room:", e);
+      });
+    } else if (socket && socket.connected) {
+      console.log("Already connected, sending rejoin_room for:", roomId);
+      socket.emit("rejoin_room", {
+        roomId,
+        username: session.username,
+        userId: session.userId,
+        gameStatus: session.gameStatus,
+      });
+    } else {
+      console.log("Socket not available for rejoin");
       return false;
     }
+
+    return true;
   };
 
   const playerReady = () => {
@@ -756,6 +884,7 @@ export const GameProvider = ({ children }) => {
       setBotInterval(null);
     }
     setIsBotMode(false);
+    setOpponentDisconnected(false);
     setPlayerData({
       username: playerData.username,
       hp: 100,
@@ -782,6 +911,8 @@ export const GameProvider = ({ children }) => {
       duration: 0,
     });
     setMatchResult(null);
+    // Clear all session data
+    clearSessionData();
     localStorage.removeItem("typeRoyaleState");
     localStorage.removeItem("typeRoyalePlayerId");
     // Keep userId for future games
@@ -805,6 +936,7 @@ export const GameProvider = ({ children }) => {
 
     // Reset all game state
     setIsBotMode(false);
+    setOpponentDisconnected(false);
     setPlayerData({
       username: playerData.username,
       hp: 100,
@@ -832,6 +964,8 @@ export const GameProvider = ({ children }) => {
       duration: 0,
     });
     setMatchResult(null);
+    // Clear all session data
+    clearSessionData();
     localStorage.removeItem("typeRoyaleState");
     localStorage.removeItem("typeRoyalePlayerId");
 
@@ -846,6 +980,7 @@ export const GameProvider = ({ children }) => {
     gameState,
     matchResult,
     isBotMode,
+    opponentDisconnected,
     connectSocket,
     createRoom,
     joinRoom,
