@@ -1,9 +1,240 @@
 /* ============================= */
+/*  GLOBAL STYLES - CASTLE THEME */
+/* ============================= */
+
+/* MedievalSharp - untuk judul (punya lowercase & uppercase) */
+@import url("https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap");
+
+/* Poppins - untuk body text (modern, clean, punya lowercase & uppercase) */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap");
+
+/* Merriweather - alternatif untuk text yang lebih formal */
+@import url("https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-glow-gold {
+    text-shadow: 0 0 10px rgba(234, 179, 8, 0.5),
+      0 0 20px rgba(234, 179, 8, 0.3);
+  }
+
+  /* Background Animation */
+  .bg-grid-pattern {
+    background-size: 50px 50px;
+    background-image: linear-gradient(
+        to right,
+        rgba(255, 255, 255, 0.05) 1px,
+        transparent 1px
+      ),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  }
+}
+
+/* Add this for the floating particles */
+@keyframes float-particle {
+  0%,
+  100% {
+    transform: translateY(0) translateX(0);
+    opacity: 0.3;
+  }
+  50% {
+    transform: translateY(-20px) translateX(10px);
+    opacity: 0.8;
+  }
+}
+
+.animate-float-slow {
+  animation: float-particle 8s ease-in-out infinite;
+}
+.animate-float-medium {
+  animation: float-particle 5s ease-in-out infinite reverse;
+}
+
+/* Twinkle animation for stars */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.animate-twinkle {
+  animation: twinkle 2s ease-in-out infinite;
+}
+
+.animate-twinkle-delayed {
+  animation: twinkle 2.5s ease-in-out infinite;
+  animation-delay: 0.5s;
+}
+
+:root {
+  /* Castle/Medieval Color Palette */
+  --color-gold: #ffd700;
+  --color-gold-dark: #b8860b;
+  --color-bronze: #cd7f32;
+  --color-castle-stone: #8b8589;
+  --color-castle-dark: #2c2c2c;
+  --color-royal-purple: #4b0082;
+  --color-royal-blue: #1e3a5f;
+  --color-blood-red: #8b0000;
+  --color-forest-green: #228b22;
+  --color-parchment: #f5e6d3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Poppins", sans-serif;
+  background-color: #0a0a0f;
+  overflow-x: hidden;
+}
+
+/* Font Classes */
+.font-royal {
+  font-family: "Poppins", sans-serif;
+}
+
+.font-display {
+  font-family: "Merriweather", serif;
+}
+
+/* ============================= */
 /*  PIXEL ART SUPPORT            */
 /* ============================= */
 
 .pixelated {
-    image-rendering: pixelated;
+  image-rendering: pixelated;
+}
+
+/* ============================= */
+/*  CASTLE TEXTURE OVERLAY       */
+/* ============================= */
+
+.castle-texture {
+  background-image: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.3),
+      rgba(0, 0, 0, 0.5)
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 50px,
+      rgba(0, 0, 0, 0.03) 50px,
+      rgba(0, 0, 0, 0.03) 51px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 25px,
+      rgba(0, 0, 0, 0.03) 25px,
+      rgba(0, 0, 0, 0.03) 26px
+    );
+}
+
+/* ============================= */
+/*  GOLDEN BORDER EFFECTS        */
+/* ============================= */
+
+.border-gold {
+  border: 3px solid transparent;
+  background: linear-gradient(#1a1a2e, #1a1a2e) padding-box,
+    linear-gradient(135deg, #ffd700, #b8860b, #ffd700) border-box;
+}
+
+.border-gold-thick {
+  border: 4px solid transparent;
+  background: linear-gradient(#1a1a2e, #1a1a2e) padding-box,
+    linear-gradient(135deg, #ffd700, #ffa500, #ffd700, #b8860b, #ffd700)
+      border-box;
+}
+
+/* ============================= */
+/*  GLOWING TEXT EFFECTS         */
+/* ============================= */
+
+.text-glow-gold {
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 215, 0, 0.6),
+    0 0 30px rgba(255, 215, 0, 0.4);
+}
+
+.text-glow-red {
+  text-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.6),
+    0 0 30px rgba(255, 0, 0, 0.4);
+}
+
+.text-glow-blue {
+  text-shadow: 0 0 10px rgba(0, 150, 255, 0.8), 0 0 20px rgba(0, 150, 255, 0.6),
+    0 0 30px rgba(0, 150, 255, 0.4);
+}
+
+.text-glow-green {
+  text-shadow: 0 0 10px rgba(0, 255, 100, 0.8), 0 0 20px rgba(0, 255, 100, 0.6),
+    0 0 30px rgba(0, 255, 100, 0.4);
+}
+
+/* ============================= */
+/*  ROYAL BUTTON STYLES          */
+/* ============================= */
+
+.btn-royal {
+  position: relative;
+  padding: 1rem 2rem;
+  font-family: "Poppins", sans-serif;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  background: linear-gradient(180deg, #4b0082 0%, #2e0854 50%, #1a0033 100%);
+  border: 2px solid #ffd700;
+  color: #ffd700;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(75, 0, 130, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-royal:hover {
+  background: linear-gradient(180deg, #5c0099 0%, #3e0866 50%, #2a0044 100%);
+  box-shadow: 0 6px 20px rgba(75, 0, 130, 0.6), 0 0 30px rgba(255, 215, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn-royal:active {
+  transform: translateY(0);
+}
+
+.btn-battle {
+  background: linear-gradient(180deg, #8b0000 0%, #5c0000 50%, #3d0000 100%);
+  border-color: #ff4444;
+  color: #ffcccc;
+}
+
+.btn-battle:hover {
+  background: linear-gradient(180deg, #aa0000 0%, #7c0000 50%, #5d0000 100%);
+  box-shadow: 0 6px 20px rgba(139, 0, 0, 0.6), 0 0 30px rgba(255, 0, 0, 0.3);
+}
+
+.btn-shield {
+  background: linear-gradient(180deg, #1e3a5f 0%, #122840 50%, #0a1929 100%);
+  border-color: #4da6ff;
+  color: #b3d9ff;
+}
+
+.btn-shield:hover {
+  background: linear-gradient(180deg, #2e4a6f 0%, #1e3850 50%, #142939 100%);
+  box-shadow: 0 6px 20px rgba(30, 58, 95, 0.6), 0 0 30px rgba(77, 166, 255, 0.3);
 }
 
 /* ============================= */
@@ -11,24 +242,24 @@
 /* ============================= */
 
 @keyframes fireball {
-    0% {
-        transform: scale(0.3);
-        opacity: 0;
-    }
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
 
-    40% {
-        transform: scale(1.2);
-        opacity: 1;
-    }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
 
-    100% {
-        transform: scale(0.8);
-        opacity: 0;
-    }
+  100% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
 }
 
 .animate-fireball {
-    animation: fireball 0.8s ease-out forwards;
+  animation: fireball 0.8s ease-out forwards;
 }
 
 /* ============================= */
@@ -36,24 +267,24 @@
 /* ============================= */
 
 @keyframes shield {
-    0% {
-        transform: scale(0.7);
-        opacity: 0;
-    }
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
 
-    50% {
-        transform: scale(1);
-        opacity: 1;
-    }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
 
-    100% {
-        transform: scale(1.1);
-        opacity: 0;
-    }
+  100% {
+    transform: scale(1.1);
+    opacity: 0;
+  }
 }
 
 .animate-shield {
-    animation: shield 0.6s ease-out forwards;
+  animation: shield 0.6s ease-out forwards;
 }
 
 /* ============================= */
@@ -61,29 +292,29 @@
 /* ============================= */
 
 @keyframes tower-hit {
-    0% {
-        transform: translateX(0);
-    }
+  0% {
+    transform: translateX(0);
+  }
 
-    25% {
-        transform: translateX(-6px);
-    }
+  25% {
+    transform: translateX(-6px);
+  }
 
-    50% {
-        transform: translateX(6px);
-    }
+  50% {
+    transform: translateX(6px);
+  }
 
-    75% {
-        transform: translateX(-4px);
-    }
+  75% {
+    transform: translateX(-4px);
+  }
 
-    100% {
-        transform: translateX(0);
-    }
+  100% {
+    transform: translateX(0);
+  }
 }
 
 .animate-tower-hit {
-    animation: tower-hit 0.3s ease-out;
+  animation: tower-hit 0.3s ease-out;
 }
 
 /* ============================= */
@@ -91,17 +322,144 @@
 /* ============================= */
 
 @keyframes fade-in {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
 
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .animate-fade-in {
-    animation: fade-in 0.3s ease-out;
+  animation: fade-in 0.3s ease-out;
+}
+
+/* ============================= */
+/*  SCREEN SHAKE (WRONG INPUT)   */
+/* ============================= */
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-10px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(10px);
+  }
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* ============================= */
+/*  DAMAGE FLASH (RED OVERLAY)   */
+/* ============================= */
+
+@keyframes flash {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-flash {
+  animation: flash 0.5s ease-out forwards;
+}
+
+/* ============================= */
+/*  HP BAR DAMAGE FLASH          */
+/* ============================= */
+
+@keyframes damage-flash {
+  0% {
+    box-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+    transform: scale(1.02);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.6);
+    transform: scale(1.05);
+  }
+  100% {
+    box-shadow: none;
+    transform: scale(1);
+  }
+}
+
+.animate-damage-flash {
+  animation: damage-flash 0.4s ease-out;
+}
+
+/* ============================= */
+/*  CONFETTI FALL ANIMATION      */
+/* ============================= */
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+    opacity: 1;
+  }
+  25% {
+    transform: translateY(25vh) translateX(20px) rotate(90deg);
+  }
+  50% {
+    transform: translateY(50vh) translateX(-15px) rotate(180deg);
+  }
+  75% {
+    transform: translateY(75vh) translateX(25px) rotate(270deg);
+  }
+  100% {
+    transform: translateY(110vh) translateX(-10px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.animate-confetti-fall {
+  animation: confetti-fall 4s ease-in-out forwards;
+}
+
+/* ============================= */
+/*  SPARKLE ANIMATION            */
+/* ============================= */
+
+@keyframes sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.animate-sparkle {
+  animation: sparkle 2s ease-in-out infinite;
 }
