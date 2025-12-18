@@ -1,82 +1,145 @@
-import React from 'react';
-import { Flame, Shield, Zap } from 'lucide-react';
+import React from "react";
+import { Flame, Shield, Zap, Sparkles } from "lucide-react";
 
 const Card = ({ type, damage, difficulty, onClick, disabled, isSelected }) => {
-    const cardStyles = {
-        easy: {
-            bg: 'bg-gradient-to-br from-green-400 to-green-600',
-            border: 'border-green-500',
-            glow: 'shadow-green-500/50',
-            icon: Zap,
-            color: 'text-green-100'
-        },
-        medium: {
-            bg: 'bg-gradient-to-br from-orange-400 to-orange-600',
-            border: 'border-orange-500',
-            glow: 'shadow-orange-500/50',
-            icon: Flame,
-            color: 'text-orange-100'
-        },
-        hard: {
-            bg: 'bg-gradient-to-br from-red-500 to-red-700',
-            border: 'border-red-600',
-            glow: 'shadow-red-500/50',
-            icon: Flame,
-            color: 'text-red-100'
-        },
-        shield: {
-            bg: 'bg-gradient-to-br from-blue-400 to-blue-600',
-            border: 'border-blue-500',
-            glow: 'shadow-blue-500/50',
-            icon: Shield,
-            color: 'text-blue-100'
+  const cardStyles = {
+    easy: {
+      bg: "from-emerald-700 via-emerald-600 to-emerald-800",
+      border: "border-emerald-400",
+      glow: "shadow-emerald-500/50",
+      icon: Zap,
+      iconBg: "bg-emerald-500/30",
+      accentColor: "text-emerald-300",
+      damageColor: "text-emerald-100",
+    },
+    medium: {
+      bg: "from-orange-600 via-orange-500 to-orange-700",
+      border: "border-orange-400",
+      glow: "shadow-orange-500/50",
+      icon: Flame,
+      iconBg: "bg-orange-500/30",
+      accentColor: "text-orange-200",
+      damageColor: "text-orange-100",
+    },
+    hard: {
+      bg: "from-red-700 via-red-600 to-red-800",
+      border: "border-red-400",
+      glow: "shadow-red-500/50",
+      icon: Sparkles,
+      iconBg: "bg-red-500/30",
+      accentColor: "text-red-200",
+      damageColor: "text-red-100",
+    },
+    shield: {
+      bg: "from-blue-700 via-blue-600 to-blue-800",
+      border: "border-blue-400",
+      glow: "shadow-blue-500/50",
+      icon: Shield,
+      iconBg: "bg-blue-500/30",
+      accentColor: "text-blue-200",
+      damageColor: "text-blue-100",
+    },
+  };
+
+  const style = cardStyles[type];
+  const Icon = style.icon;
+
+  const typeLabels = {
+    easy: "Quick",
+    medium: "Power",
+    hard: "Inferno",
+    shield: "Shield",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        relative group w-20 h-28 md:w-28 md:h-40 rounded-xl transition-all duration-300
+        bg-gradient-to-b ${style.bg}
+        border-2 ${style.border}
+        ${
+          isSelected
+            ? `scale-110 shadow-2xl ${style.glow} -translate-y-2 z-10`
+            : "shadow-lg hover:scale-105 hover:-translate-y-1 hover:shadow-xl"
         }
-    };
-
-    const style = cardStyles[type];
-    const Icon = style.icon;
-
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className={`
-        relative w-32 h-44 rounded-xl p-4 transition-all duration-300
-        ${style.bg} ${style.border} border-2
-        ${isSelected ? `scale-110 shadow-2xl ${style.glow}` : 'shadow-lg hover:scale-105'}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-xl'}
-        flex flex-col items-center justify-between
+        ${
+          disabled
+            ? "opacity-40 cursor-not-allowed grayscale"
+            : "cursor-pointer"
+        }
+        overflow-hidden
       `}
+    >
+      {/* Top decoration line */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+
+      {/* Inner card frame */}
+      <div className="absolute inset-1 rounded-lg border border-white/10" />
+
+      {/* Card content */}
+      <div className="relative h-full flex flex-col items-center justify-between p-2 md:p-3">
+        {/* Card Title */}
+        <div className="text-center">
+          <h3
+            className={`font-royal font-bold text-xs md:text-sm uppercase tracking-wide ${style.accentColor}`}
+          >
+            {typeLabels[type]}
+          </h3>
+          <p className="text-[8px] md:text-[10px] text-white/60 font-royal mt-0.5 hidden md:block">
+            {difficulty}
+          </p>
+        </div>
+
+        {/* Icon */}
+        <div
+          className={`${style.iconBg} p-2 md:p-3 rounded-full backdrop-blur-sm border border-white/20`}
         >
-            {/* Card Header */}
-            <div className="text-center">
-                <h3 className={`font-bold text-lg uppercase ${style.color}`}>
-                    {type}
-                </h3>
-                <p className="text-xs text-white/80 mt-1">{difficulty}</p>
-            </div>
+          <Icon
+            className={`w-5 h-5 md:w-8 md:h-8 ${style.damageColor} drop-shadow-lg`}
+            strokeWidth={2}
+          />
+        </div>
 
-            {/* Icon */}
-            <Icon className={`w-12 h-12 ${style.color}`} strokeWidth={2.5} />
+        {/* Damage/Effect */}
+        <div className="text-center">
+          {type === "shield" ? (
+            <p
+              className={`font-royal font-bold text-xs md:text-sm ${style.damageColor}`}
+            >
+              BLOCK
+            </p>
+          ) : (
+            <>
+              <p
+                className={`font-royal text-xl md:text-3xl font-bold ${style.damageColor} drop-shadow-md`}
+              >
+                {damage}
+              </p>
+              <p className="text-[8px] md:text-[10px] text-white/50 font-royal -mt-1">
+                DMG
+              </p>
+            </>
+          )}
+        </div>
+      </div>
 
-            {/* Damage/Effect */}
-            <div className="text-center">
-                {type === 'shield' ? (
-                    <p className="text-white font-bold text-sm">BLOCK</p>
-                ) : (
-                    <>
-                        <p className="text-3xl font-bold text-white">{damage}</p>
-                        <p className="text-xs text-white/80">DMG</p>
-                    </>
-                )}
-            </div>
+      {/* Selected glow effect */}
+      {isSelected && (
+        <>
+          <div className="absolute inset-0 rounded-xl border-2 border-yellow-400 animate-pulse" />
+          <div className="absolute -inset-1 rounded-xl bg-yellow-400/20 blur-md -z-10" />
+        </>
+      )}
 
-            {/* Selected Indicator */}
-            {isSelected && (
-                <div className="absolute inset-0 rounded-xl border-4 border-yellow-400 animate-pulse" />
-            )}
-        </button>
-    );
+      {/* Hover shine effect */}
+      <div className="absolute inset-0 bg-gradient-to-t from-transparent via-white/5 to-white/10 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+
+      {/* Bottom decoration */}
+      <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-black/30 to-transparent" />
+    </button>
+  );
 };
 
 export default Card;
